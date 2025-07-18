@@ -1,3 +1,9 @@
+/*
+    lol.
+    Copyright (C) 2025 r4qq
+*/
+
+
 #pragma once
 
 #include <algorithm>
@@ -21,8 +27,10 @@ namespace Tensor
                 : rows(rows), cols(cols), data(rows * cols) 
                 {static_assert(std::is_arithmetic<T>::value, "Type must be numeric");}
 
-            size_t rowCout() const {return rows;}
-            size_t colCout() const {return cols;}
+            constexpr size_t rowCount() const {return rows;}
+            constexpr size_t colCount() const {return cols;}
+            constexpr std::vector<T>& retData() {return data;}
+            constexpr const std::vector<T>& retData() const {return data;}
 
             T& operator()(size_t i, size_t j)
             {
@@ -75,9 +83,24 @@ namespace Tensor
                 return result;
             }
 
-            Tensor<T> transpose() const
+            Tensor<T> operator*(const T& scalar) const
             {
                 Tensor<T> result(rows, cols);
+
+                std::transform(data.begin(), data.end(), result.data.begin(),
+                               [&scalar](const T& val){return val * scalar;});
+
+                return result;                
+            }
+
+            Tensor<T> operator*(const Tensor<T>& otherTensor) const
+            {
+
+            }
+
+            Tensor<T> transpose() const
+            {
+                Tensor<T> result(cols, rows); // empty transposed matrix
 
                 
             }
@@ -102,4 +125,15 @@ namespace Tensor
                 }
             }
     };
+
+    template<typename T>
+    Tensor<T> operator*(const T& scalar, const Tensor<T>& tensor)
+    {
+        Tensor<T> result(tensor.rowCount(), tensor.colCount());
+
+        std::transform(tensor.retData().begin(), tensor.retData().end(), result.retData().begin(),
+                       [&scalar](const T& val){return val * scalar;});
+
+        return result;       
+    }
 }   

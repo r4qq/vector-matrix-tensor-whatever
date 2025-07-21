@@ -29,8 +29,8 @@ namespace Tensor
 
             constexpr size_t rowCount() const {return rows;}
             constexpr size_t colCount() const {return cols;}
-            constexpr std::vector<T>& retData() {return data;}
-            constexpr const std::vector<T>& retData() const {return data;}
+            std::vector<T>& retData() {return data;}
+            const std::vector<T>& retData() const {return data;}
 
             T& operator()(size_t i, size_t j)
             {
@@ -95,20 +95,53 @@ namespace Tensor
 
             Tensor<T> operator*(const Tensor<T>& otherTensor) const
             {
+                if(cols != otherTensor.rows)
+                    throw std::runtime_error("Matrix dimensions incompatible for multiplication");
+                
+                size_t T1 = rows;
+                size_t T2 = otherTensor.cols;
+                size_t T3 = cols;
+                Tensor<T> result(T1, T2);
 
+                if (T1 == 1 && T2 == 1)
+                { 
+                    result(0, 0) = (*this)(0, 0) * otherTensor(0, 0);
+                    return result;
+                }
+
+                for (size_t i = 0; i < T1; ++i)
+                {
+                    for (size_t j = 0; j < T2; ++j)
+                    {
+                        T sum = T{};
+                        for (size_t k = 0; k < T3; ++k)
+                        {
+                            sum += (*this)(i, k) * otherTensor(k, j);
+                        }
+                        result(i, j) = sum;
+                    }
+                }
+                
+                return result;
             }
 
-            Tensor<T> transpose() const
+            void transpose() 
             {
-                Tensor<T> result(cols, rows); // empty transposed matrix
-
-                
+                Tensor<T> result(cols, rows);
+                for (size_t i = 0; i < rows; ++i) 
+                {
+                    for (size_t j = 0; j < cols; ++j) 
+                    {
+                        result(j, i) = (*this)(i, j);
+                    }
+                }
+                (*this) = result;
             }
 
             template<typename U>
             void fill(const U& value)
             {
-                static_assert(std::is_convertible<T, U>::value, "U must be convertible to T");
+                static_assert(std::is_convertible<U, T>::value, "U must be convertible to T");
                 std::fill(data.begin(), data.end(), static_cast<T>(value));
             }
 
@@ -126,14 +159,9 @@ namespace Tensor
             }
     };
 
-    template<typename T>
-    Tensor<T> operator*(const T& scalar, const Tensor<T>& tensor)
+    template<typename T, typename U>
+    Tensor<T> operator*(const U& scalar, const Tensor<T>& tensor)
     {
-        Tensor<T> result(tensor.rowCount(), tensor.colCount());
-
-        std::transform(tensor.retData().begin(), tensor.retData().end(), result.retData().begin(),
-                       [&scalar](const T& val){return val * scalar;});
-
-        return result;       
+        return tensor * scalar;       
     }
 }   

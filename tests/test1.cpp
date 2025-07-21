@@ -2,18 +2,21 @@
 
 int main(void)
 {
-    Tensor::Tensor<float> A(3, 3);
-    A.fill(5.0);
+    Tensor::Tensor<int> A(1, 2);
+    A.fill(5);
     A.print();          
-    A = A * 3.0;
+    A = A * 3;
     A.print();
 
-    Tensor::Tensor<int> B(3, 3);
+    Tensor::Tensor<int> B(2, 1);
     B.fill(3);
     B.print(); 
     B = 10 * B;
-    B.print();       
+    B.print();    
+    B.transpose();
+    B.print();   
 
- 
+    auto C = A * B;
+    C.print();
 
 }

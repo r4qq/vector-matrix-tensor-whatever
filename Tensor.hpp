@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <type_traits>
@@ -18,31 +19,37 @@ namespace Tensor
     template<typename T>
     class Tensor
     {
+        static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
+
         private:
             size_t rows, cols;
             std::vector<T> data;
 
         public: 
+            
             Tensor(size_t rows, size_t cols) 
-                : rows(rows), cols(cols), data(rows * cols) 
-                {static_assert(std::is_arithmetic<T>::value, "Type must be numeric");}
+                {
+                    if(rows == 0 || cols == 0)
+                        throw std::invalid_argument("Size can't be 0");
+                    
+                    this->rows = rows;
+                    this->cols = cols;
+                    data.resize(rows * cols, T{});
+                }
 
-            constexpr size_t rowCount() const {return rows;}
-            constexpr size_t colCount() const {return cols;}
-            std::vector<T>& retData() {return data;}
-            const std::vector<T>& retData() const {return data;}
+            ~Tensor() = default;
 
             T& operator()(size_t i, size_t j)
             {
                 if (i >= rows || j >= cols) 
-                    throw std::out_of_range("Index out of range"); 
+                    throw std::out_of_range("Index out of range: (" + std::to_string(i) + ", " + std::to_string(j) + ")"); 
                 return data[(i * cols) + j];
             } 
 
             const T& operator()(size_t i, size_t j) const
             {
                 if (i >= rows || j >= cols) 
-                    throw std::out_of_range("Index out of range"); 
+                    throw std::out_of_range("Index out of range: (" + std::to_string(i) + ", " + std::to_string(j) + ")"); 
                 
                 return data[(i * cols) + j];
             } 
@@ -57,30 +64,29 @@ namespace Tensor
                 return !(*this == otherTensor);
             }
 
-            Tensor<T> operator+(const Tensor<T>& otherTensor) const
+            //helper
+
+            template<typename BinaryOp>
+            Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
             {
                 if(rows != otherTensor.rows || cols != otherTensor.cols)
                     throw std::runtime_error("Size mismatch");
-                    
+
                 Tensor<T> result(rows, cols);
 
-                std::transform(data.begin(), data.end(), otherTensor.data.begin(), result.data.begin(),
-                               [](const T& a, const T&b){return a + b;});
+                std::transform(data.begin(), data.end(), otherTensor.data.begin(), result.data.begin(), op);
 
                 return result;
             }
 
+            Tensor<T> operator+(const Tensor<T>& otherTensor) const
+            {
+                return elementWiseOp(otherTensor, std::plus<T>());
+            }
+
             Tensor<T> operator-(const Tensor<T>& otherTensor) const
             {
-                if(rows != otherTensor.rows || cols != otherTensor.cols)
-                    throw std::runtime_error("Size mismatch");
-                    
-                Tensor<T> result(rows, cols);
-
-                std::transform(data.begin(), data.end(), otherTensor.data.begin(), result.data.begin(),
-                               [](const T& a, const T&b){return a - b;});
-
-                return result;
+                return elementWiseOp(otherTensor, std::minus<T>());
             }
 
             Tensor<T> operator*(const T& scalar) const
@@ -103,20 +109,14 @@ namespace Tensor
                 size_t T3 = cols;
                 Tensor<T> result(T1, T2);
 
-                if (T1 == 1 && T2 == 1)
-                { 
-                    result(0, 0) = (*this)(0, 0) * otherTensor(0, 0);
-                    return result;
-                }
-
-                for (size_t i = 0; i < T1; ++i)
+                for (size_t i = 0; i < rows; ++i)
                 {
-                    for (size_t j = 0; j < T2; ++j)
+                    for (size_t j = 0; j < otherTensor.cols; ++j)
                     {
                         T sum = T{};
-                        for (size_t k = 0; k < T3; ++k)
+                        for (size_t k = 0; k < cols; ++k)
                         {
-                            sum += (*this)(i, k) * otherTensor(k, j);
+                            sum += (*this)(i, k) * otherTensor(k, j); 
                         }
                         result(i, j) = sum;
                     }
@@ -125,7 +125,11 @@ namespace Tensor
                 return result;
             }
 
-            void transpose() 
+            constexpr size_t rowCount() const {return rows;}
+            constexpr size_t colCount() const {return cols;}
+            const std::vector<T>& retData() const {return data;}
+
+            Tensor<T> transpose() const
             {
                 Tensor<T> result(cols, rows);
                 for (size_t i = 0; i < rows; ++i) 
@@ -135,11 +139,11 @@ namespace Tensor
                         result(j, i) = (*this)(i, j);
                     }
                 }
-                (*this) = result;
+                return result;
             }
 
             template<typename U>
-            void fill(const U& value)
+            void fill(const U& value)  
             {
                 static_assert(std::is_convertible<U, T>::value, "U must be convertible to T");
                 std::fill(data.begin(), data.end(), static_cast<T>(value));

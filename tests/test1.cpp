@@ -13,8 +13,8 @@ int main(void)
     B.print(); 
     B = 10 * B;
     B.print();    
-    B.transpose();
-    B.print();   
+    //B = B.transpose();
+    //B.print();   
 
     auto C = A * B;
     C.print();

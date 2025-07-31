@@ -33,7 +33,14 @@ namespace Tensor
         template<typename BinaryOp>
         inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
+            if (this->shape != otherTensor.shape)
+                throw std::runtime_error("Tensors shape mismatch");
             
+            std::vector<T> result(this->shape);
+            std::transform(this->data.begin(), 
+                           this->data.end(), 
+                           result.begin(), op);
+            return result;
         }
 
         template<size_t N>
@@ -53,18 +60,18 @@ namespace Tensor
         Tensor(std::vector<size_t> shape)
             : shape(std::move(shape)), 
               strides(this->shape.size()), 
-              data([&]()
-              {
-                size_t size = 1;
-                for (const auto& dim : this->shape) 
-                {
-                    if (dim == 0) 
-                    {
-                        throw std::invalid_argument("Shape dimension must be > 0");
-                    }
-                }
-              })
+              data()
         {
+            size_t total_size = 1;
+            for (const auto& dim : shape) 
+            {
+                if (dim == 0) {
+                    throw std::invalid_argument("Shape dimension must be > 0");
+                }
+                total_size *= dim;
+            }
+            data.resize(total_size, T{});
+            
             strides.back() = 1;
             for (int i = static_cast<int>(shape.size()) - 2; i >= 0; --i)
                 strides[i] = strides[i + 1] * shape[i + 1];
@@ -134,7 +141,7 @@ namespace Tensor
      
         Tensor<T> operator*(const T& scalar) const
         {
-            Tensor<T> result(this->data.size());
+            Tensor<T> result(this->shape);
             std::transform(data.begin(), data.end(), result.data.begin(),
                            [&scalar](const T& val){ return val * scalar; });
             return result;

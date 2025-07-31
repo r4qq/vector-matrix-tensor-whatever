@@ -8,10 +8,12 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -27,6 +29,24 @@ namespace Tensor
         std::vector<size_t> shape;     ///< Shape vector representing each dimension  
         std::vector<size_t> strides;
         std::vector<T> data;           ///< Flat storage of matrix elements.
+
+        template<typename BinaryOp>
+        inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
+        {
+            
+        }
+
+        template<size_t N>
+        size_t computeFlatIndex(const std::array<size_t, N>& indices) const
+        {
+            size_t flatIndex = 0;
+            for(size_t i = 0; i < indices.size(); i++)
+            {
+                flatIndex += strides[i] * indices[i];
+            }
+
+            return flatIndex;
+        }
 
     public:
        
@@ -52,26 +72,44 @@ namespace Tensor
 
         ~Tensor() = default;
 
-        template<typename Indices>
-        T& operator()(Indices indices)
+        template<typename... Indices>
+        T& operator()(Indices... indices)
         {
-            if (indices)
-                throw std::out_of_range("Index out of range: (" + std::to_string(i) + ", " + std::to_string(j) + ")");
-            return data[(i * cols) + j];
+            if (sizeof...(indices) != shape.size())
+                throw std::invalid_argument("Invalid number of indices");
+
+            std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            for(size_t i = 0; i < shape.size(); i++)
+            {
+                if(idxArr[i] >= shape[i])
+                    throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
+            }
+
+            return data[computeFlatIndex(idxArr)];
         }
 
-       
-        const T& operator()(size_t i, size_t j) const
+        template<typename... Indices>
+        const T& operator()(Indices... indices) const
         {
-            if (i >= rows || j >= cols)
-                throw std::out_of_range("Index out of range: (" + std::to_string(i) + ", " + std::to_string(j) + ")");
-            return data[(i * cols) + j];
+            if (sizeof...(indices) != shape.size())
+                throw std::invalid_argument("Invalid number of indices");
+
+            std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            for(size_t i = 0; i < shape.size(); i++)
+            {
+                if(idxArr[i] >= shape[i])
+                    throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
+            }
+
+            return data[computeFlatIndex(idxArr)];
         }
 
        
         bool operator==(const Tensor<T>& otherTensor) const
         {
-            return rows == otherTensor.rows && cols == otherTensor.cols && data == otherTensor.data;
+            return this->shape == otherTensor.shape && 
+                   this->strides == otherTensor.strides && 
+                   this->data == otherTensor.data;
         }
 
       
@@ -81,24 +119,14 @@ namespace Tensor
         }
 
        
-        template<typename BinaryOp>
-        inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
-        {
-            if(rows != otherTensor.rows || cols != otherTensor.cols)
-                throw std::runtime_error("Size mismatch");
-
-            Tensor<T> result(rows, cols);
-            std::transform(data.begin(), data.end(), otherTensor.data.begin(), result.data.begin(), op);
-            return result;
-        }
-
+        
        
-        Tensor<T> operator+(const Tensor<T>&& otherTensor) const
+        Tensor<T> operator+(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::plus<T>());
         }
 
-        Tensor<T> operator-(const Tensor<T>&& otherTensor) const
+        Tensor<T> operator-(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::minus<T>());
         }
@@ -106,7 +134,7 @@ namespace Tensor
      
         Tensor<T> operator*(const T& scalar) const
         {
-            Tensor<T> result(rows, cols);
+            Tensor<T> result(this->data.size());
             std::transform(data.begin(), data.end(), result.data.begin(),
                            [&scalar](const T& val){ return val * scalar; });
             return result;
@@ -115,41 +143,12 @@ namespace Tensor
         
         Tensor<T> operator*(const Tensor<T>& otherTensor) const
         {
-            if(cols != otherTensor.rows)
-                throw std::runtime_error("Matrix dimensions incompatible for multiplication");
-
-            size_t T1 = rows;
-            size_t T2 = otherTensor.cols;
-            Tensor<T> result(T1, T2);
-
-            for (size_t i = 0; i < rows; ++i)
-            {
-                for (size_t j = 0; j < otherTensor.cols; ++j)
-                {
-                    T sum = T{};
-                    for (size_t k = 0; k < cols; ++k)
-                    {
-                        sum += (*this)(i, k) * otherTensor(k, j);
-                    }
-                    result(i, j) = sum;
-                }
-            }
-            return result;
+            
         }
-
-        constexpr size_t retShape() const { return shape; }
       
         Tensor<T> transpose() const
         {
-            Tensor<T> result(cols, rows);
-            for (size_t i = 0; i < rows; ++i)
-            {
-                for (size_t j = 0; j < cols; ++j)
-                {
-                    result(j, i) = (*this)(i, j);
-                }
-            }
-            return result;
+            
         }
 
         template<typename U>
@@ -162,26 +161,8 @@ namespace Tensor
         
         inline void print() const
         {
-            for (size_t i = 0; i < rows; ++i)
-            {
-                for (size_t j = 0; j < cols; ++j)
-                {
-                    std::cout << (*this)(i, j);
-                    if (j < cols - 1) std::cout << " ";
-                }
-                std::cout << std::endl;
-            }
+            
         }
-
-        
-        /*
-        T determinant()
-        {
-            if(rows != cols)
-                throw std::runtime_error("Matrix is not square");
-            ...
-        }
-        */
     };
 
    
